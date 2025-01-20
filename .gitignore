@@ -6,9 +6,6 @@ __pycache__/
 # Virtual environment
 venv/
 
-# NLTK data
-nltk_data/
-
 # Distribution / packaging
 .Python
 build/
@@ -119,3 +116,6 @@ cython_debug/
 
 # VS Code
 .vscode/
+
+# System temp files
+.DS_Store
