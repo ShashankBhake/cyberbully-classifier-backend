@@ -10,8 +10,14 @@ from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 import numpy as np
 
-nltk.download('punkt_tab')
-nltk.download('wordnet')
+# Set NLTK data path to a writable directory
+nltk_data_path = os.path.join(os.getcwd(), 'nltk_data')
+if not os.path.exists(nltk_data_path):
+    os.makedirs(nltk_data_path)
+nltk.data.path.append(nltk_data_path)
+
+nltk.download('punkt', download_dir=nltk_data_path)
+nltk.download('wordnet', download_dir=nltk_data_path)
 
 app = Flask(__name__)
 
@@ -75,7 +81,7 @@ def extract_messages(text):
 def extract_instagram_messages(username):
     messages = []
     base_path = os.path.join('extracted_files', 'your_instagram_activity', 'messages', 'inbox')
-    user_folders = None
+    user_folders = []
     for folder_name in os.listdir(base_path):
         if folder_name.startswith(username):
             user_folders.append(folder_name)
@@ -113,7 +119,6 @@ def extract_facebook_messages(username):
                             messages.append(message['content'])
                             
     return messages
-    
 
 @app.route('/')
 def home():
@@ -186,7 +191,7 @@ def upload():
             return jsonify({'error': 'No username part'}), 400
         
         username = request.form['username']
-
+        
         if file and file.filename.endswith('.zip'):
             with zipfile.ZipFile(file, 'r') as zip_ref:
                 zip_ref.extractall('extracted_files')
