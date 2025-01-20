@@ -9,6 +9,12 @@ from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 import numpy as np
 
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+nltk.download('punkt')
+nltk.download('punkt_tab')
+
 app = Flask(__name__)
 
 # Load your saved vectorizer and model
