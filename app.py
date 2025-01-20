@@ -4,6 +4,7 @@ import zipfile
 import os
 import shutil
 import json
+import nltk
 from flask import Flask, request, jsonify
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
