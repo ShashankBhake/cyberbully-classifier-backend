@@ -4,3 +4,4 @@ flask
 tensorflow
 scikit-learn
 numpy
+gunicorn
