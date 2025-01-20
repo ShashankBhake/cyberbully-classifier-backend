@@ -12,8 +12,6 @@ import numpy as np
 
 # Set NLTK data path to a writable directory
 nltk_data_path = os.path.join(os.getcwd(), 'nltk_data')
-if not os.path.exists(nltk_data_path):
-    os.makedirs(nltk_data_path)
 nltk.data.path.append(nltk_data_path)
 
 nltk.download('punkt_tab', download_dir=nltk_data_path)
