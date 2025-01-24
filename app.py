@@ -9,13 +9,11 @@ from flask import Flask, request, jsonify
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 import numpy as np
+from io import BytesIO
 
 # Set NLTK data path to a writable directory
 nltk_data_path = os.path.join(os.getcwd(), 'nltk_data')
 nltk.data.path.append(nltk_data_path)
-
-nltk.download('punkt_tab', download_dir=nltk_data_path)
-nltk.download('wordnet', download_dir=nltk_data_path)
 
 app = Flask(__name__)
 
@@ -76,47 +74,55 @@ def extract_messages(text):
         messages.append(' '.join(current_message))
     return messages
 
-def extract_instagram_messages(username):
+def extract_instagram_messages(username, zip_data):
     messages = []
-    base_path = os.path.join('extracted_files', 'your_instagram_activity', 'messages', 'inbox')
-    user_folders = []
-    for folder_name in os.listdir(base_path):
-        if folder_name.startswith(username):
-            user_folders.append(folder_name)
-
-    if len(user_folders) == 0:
-        return messages
-    for user_folder in user_folders:
-        user_path = os.path.join(base_path, user_folder)
-        for file_name in os.listdir(user_path):
-            if file_name.startswith('message_') and file_name.endswith('.json'):
-                with open(os.path.join(user_path, file_name), 'r') as json_file:
+    try:
+        with zipfile.ZipFile(zip_data, 'r') as zip_ref:
+            # Find message files for the username
+            message_path = f'your_instagram_activity/messages/inbox/{username}'
+            message_files = [f for f in zip_ref.namelist() 
+                           if f.startswith(message_path) and f.endswith('.json')]
+            
+            for file_path in message_files:
+                with zip_ref.open(file_path) as json_file:
                     data = json.load(json_file)
                     for message in data.get('messages', []):
                         if 'content' in message:
                             messages.append(message['content'])
+    except Exception as e:
+        print(f"Error processing Instagram messages: {str(e)}")
     return messages
 
-def extract_facebook_messages(username):
+def extract_facebook_messages(username, zip_data):
     messages = []
-    base_path = os.path.join('extracted_files', 'your_facebook_activity', 'messages', 'inbox')
-    user_folders = []
-    for folder_name in os.listdir(base_path):
-        if folder_name.startswith(username):
-            user_folders.append(folder_name)
-    if len(user_folders) == 0:
-        return messages
-    for user_folder in user_folders:
-        user_path = os.path.join(base_path, user_folder)
-        for file_name in os.listdir(user_path):
-            if file_name.startswith('message_') and file_name.endswith('.json'):
-                with open(os.path.join(user_path, file_name), 'r') as json_file:
+    try:
+        with zipfile.ZipFile(zip_data, 'r') as zip_ref:
+            # Find message files for the username
+            message_path = f'your_facebook_activity/messages/inbox/{username}'
+            message_files = [f for f in zip_ref.namelist() 
+                           if f.startswith(message_path) and f.endswith('.json')]
+            
+            for file_path in message_files:
+                with zip_ref.open(file_path) as json_file:
                     data = json.load(json_file)
                     for message in data.get('messages', []):
                         if 'content' in message:
                             messages.append(message['content'])
-                            
+    except Exception as e:
+        print(f"Error processing Facebook messages: {str(e)}")
     return messages
+
+def find_chat_file(zip_ref):
+    """Find the WhatsApp chat file in the zip archive"""
+    # Look for files that match common WhatsApp chat export patterns
+    chat_patterns = ['_chat.txt', 'WhatsApp Chat.txt', 'chat.txt']
+    
+    for filename in zip_ref.namelist():
+        # Get just the file name without the path
+        base_name = os.path.basename(filename)
+        if any(pattern.lower() in base_name.lower() for pattern in chat_patterns):
+            return filename
+    return None
 
 @app.route('/')
 def home():
@@ -152,28 +158,25 @@ def upload():
     
     if type.strip() == 'whatsapp':
         if file and file.filename.endswith('.zip'):
-            with zipfile.ZipFile(file, 'r') as zip_ref:
-                zip_ref.extractall('extracted_files')
-            
-            chat_file_path = os.path.join('extracted_files', '_chat.txt')
-            if not os.path.exists(chat_file_path):
-                shutil.rmtree('extracted_files')
-                return jsonify({'error': 'No _chat.txt file found in the zip'}), 400
-            
-            with open(chat_file_path, 'r') as chat_file:
-                text = chat_file.read()
-            
-            messages = extract_messages(text)
-            if not messages:  # Check if messages were extracted
-                shutil.rmtree('extracted_files')
-                return jsonify({'error': 'No messages found in _chat.txt'}), 400
-            
-            final_score = predict_bullying_types(messages, 'whatsapp')
-            
-            # Clean up extracted files
-            shutil.rmtree('extracted_files')
-            
-            return jsonify(final_score), 200
+            # Read zip file into memory
+            zip_data = BytesIO(file.read())
+            try:
+                with zipfile.ZipFile(zip_data, 'r') as zip_ref:
+                    # Find chat file in zip
+                    chat_file_path = find_chat_file(zip_ref)
+                    if not chat_file_path:
+                        return jsonify({'error': 'No WhatsApp chat file found in the zip'}), 400
+                    
+                    # Read the found chat file
+                    chat_file = zip_ref.read(chat_file_path).decode('utf-8')
+                    messages = extract_messages(chat_file)
+                    if not messages:
+                        return jsonify({'error': 'No messages found in chat file'}), 400
+                    
+                    final_score = predict_bullying_types(messages, 'whatsapp')
+                    return jsonify(final_score), 200
+            except Exception as e:
+                return jsonify({'error': f'Error processing zip file: {str(e)}'}), 400
         
         elif file and file.filename.endswith('.txt'):
             text = file.read().decode('utf-8')
@@ -191,21 +194,13 @@ def upload():
         username = request.form['username']
         
         if file and file.filename.endswith('.zip'):
-            with zipfile.ZipFile(file, 'r') as zip_ref:
-                zip_ref.extractall('extracted_files')
-            
-            messages = extract_instagram_messages(username)
-            if not messages:  # Check if messages were extracted
-                shutil.rmtree('extracted_files')
+            zip_data = BytesIO(file.read())
+            messages = extract_instagram_messages(username, zip_data)
+            if not messages:
                 return jsonify({'error': f'No messages found for the user {username}'}), 400
             
             final_score = predict_bullying_types(messages, 'instagram')
-            
-            # Clean up extracted files
-            shutil.rmtree('extracted_files')
-            
             return jsonify(final_score), 200
-
         else:
             return jsonify({'error': 'Invalid file format'}), 400
         
@@ -216,21 +211,13 @@ def upload():
         username = request.form['username']
         
         if file and file.filename.endswith('.zip'):
-            with zipfile.ZipFile(file, 'r') as zip_ref:
-                zip_ref.extractall('extracted_files')
-            
-            messages = extract_facebook_messages(username)
+            zip_data = BytesIO(file.read())
+            messages = extract_facebook_messages(username, zip_data)
             if not messages:
-                shutil.rmtree('extracted_files')
                 return jsonify({'error': f'No messages found for the user {username}'}), 400
             
             final_score = predict_bullying_types(messages, 'facebook')
-            
-            # Clean up extracted files
-            shutil.rmtree('extracted_files')
-            
             return jsonify(final_score), 200
-        
         else:
             return jsonify({'error': 'Invalid file format'}), 400
     
