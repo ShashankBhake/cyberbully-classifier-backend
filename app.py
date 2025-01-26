@@ -61,7 +61,7 @@ except Exception as e:
 
 def preprocess(txt):
     # Remove timestamp pattern
-    txt = re.sub(r'^\[\d{2}/\d{2}/\d{2}, \d{1,2}:\d{2}:\d{2} [APM]{2}\] ', '', txt)
+    txt = re.sub(r'\[?\d{2}/\d{2}/\d{2},\s*\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)\]?\s*-?\s*', '', txt)
     txt = re.sub('[^a-zA-Z]', ' ', txt).lower().split()
     txt = [lemma.lemmatize(word) for word in txt]
     return ' '.join(txt)
@@ -99,9 +99,12 @@ def predict_bullying_types(messages, type):
 def extract_messages(text):
     messages = []
     current_message = []
+
+    timestamp_pattern = r'^\[?\d{2}/\d{2}/\d{2},\s*\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)\]?\s*-?\s*'
+    
     for line in text.split('\n'):
         line = line.replace('\u200e', '')  # Remove U+200E character
-        if re.match(r'^\[\d{2}/\d{2}/\d{2}, \d{1,2}:\d{2}:\d{2} [APM]{2}\]', line):
+        if re.match(timestamp_pattern, line):
             if current_message:
                 messages.append(' '.join(current_message))
                 current_message = []
