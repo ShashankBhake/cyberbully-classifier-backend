@@ -149,14 +149,11 @@ def extract_facebook_messages(username, zip_data):
     return messages
 
 def find_chat_file(zip_ref):
-    """Find the WhatsApp chat file in the zip archive"""
-    # Look for files that match common WhatsApp chat export patterns
-    chat_patterns = ['_chat.txt', 'WhatsApp Chat.txt', 'chat.txt']
-    
+    """Find any text file in the zip archive"""
     for filename in zip_ref.namelist():
         # Get just the file name without the path
         base_name = os.path.basename(filename)
-        if any(pattern.lower() in base_name.lower() for pattern in chat_patterns):
+        if base_name.lower().endswith('.txt'):
             return filename
     return None
 
